@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Три опоры</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Onest:wght@400;500;700&display=swap">
+<style>
+  /* Layout: one narrow column, one screen at a time (intro → 9 questions → result), like a reel you tap through */
+  :root {
+    --bg: #09090a;
+    --panel: #141416;
+    --line: #2a2a2e;
+    --fg: #f3f2f0;
+    --muted: #9a9a9f;
+    --red: #e0302a;
+    --red-dim: #5a1a18;
+    --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+    --body: "Onest", "Helvetica Neue", Arial, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-width: 520px;
+    margin-inline: auto;
+    padding-block: 32px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    box-sizing: border-box;
+  }
+  .screen { display: flex; flex-direction: column; gap: 20px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  h1, h2 { font-family: var(--display); font-weight: 800; margin: 0; text-wrap: balance; line-height: 1.12; }
+  h1 { font-size: clamp(28px, 7.5vw, 38px); }
+  h1 em { font-style: normal; color: var(--red); }
+  h2 { font-size: clamp(20px, 5.4vw, 26px); font-weight: 600; }
+  p { margin: 0; }
+  .lead { color: var(--muted); font-size: 17px; max-width: 40ch; }
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pillar { border: 1px solid var(--line); border-radius: 6px; padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .pillar b { font-family: var(--display); font-weight: 600; font-size: 15px; }
+  .pillar span { font-size: 12px; color: var(--muted); }
+  .num { font-family: var(--display); font-size: 12px; color: var(--red); }
+  .btn {
+    appearance: none; border: 0; cursor: pointer;
+    background: var(--red); color: var(--fg);
+    font: 700 17px/1 var(--body);
+    padding: 18px 20px; border-radius: 6px;
+    text-align: center; text-decoration: none; display: block;
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(.985); }
+  .btn:focus-visible, .opt:focus-visible, .ghost:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+  .btn[aria-disabled="true"] { background: var(--red-dim); color: var(--muted); cursor: default; }
+  .ghost { appearance: none; background: none; border: 0; color: var(--muted); font: 500 15px var(--body); cursor: pointer; padding: 8px 0; align-self: flex-start; }
+  .ghost:hover { color: var(--fg); }
+  .note { font-size: 13px; color: var(--muted); }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .count { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+  .bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--red); width: 0; transition: width .25s ease; }
+  .tag { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+  .opts { display: flex; flex-direction: column; gap: 10px; }
+  .opt {
+    appearance: none; text-align: left; cursor: pointer;
+    background: var(--panel); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 6px;
+    font: 500 16px/1.35 var(--body); padding: 16px 16px;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  .opt:hover { border-color: var(--muted); }
+  .opt.picked { border-color: var(--red); background: #1c1112; }
+
+  .verdict { font-family: var(--display); font-weight: 800; font-size: clamp(44px, 14vw, 72px); color: var(--red); line-height: 1; text-transform: uppercase; }
+  .scores { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding-block: 16px; }
+  .score { display: grid; grid-template-columns: 5.5rem 1fr 2.5rem; align-items: center; gap: 12px; font-size: 14px; }
+  .score .track { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .score .track i { display: block; height: 100%; background: var(--muted); border-radius: 4px; }
+  .score.weak .track i { background: var(--red); }
+  .score.weak b { color: var(--red); }
+  .score em { font-style: normal; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .body-text { display: flex; flex-direction: column; gap: 12px; font-size: 17px; }
+  .body-text p:first-child { color: var(--fg); }
+  .body-text p + p { color: var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .screen { animation: in .28s ease both; }
+    @keyframes in { from { opacity: .001; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  }
+  *{box-sizing:border-box} body{margin:0} [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <!-- Intro -->
+  <section class="screen" id="intro">
+    <span class="eyebrow">Тест · 9 вопросов · 2 минуты</span>
+    <h1>Какая из <em>3 опор</em> у тебя сломана?</h1>
+    <p class="lead">Мужчина держится на трёх вещах. Сломана одна — остальные долго не протянут.</p>
+    <div class="pillars">
+      <div class="pillar"><span class="num">I</span><b>Тело</b><span>выдерживает нагрузки</span></div>
+      <div class="pillar"><span class="num">II</span><b>Голова</b><span>не ломается под давлением</span></div>
+      <div class="pillar"><span class="num">III</span><b>Деньги</b><span>навык, который кормит</span></div>
+    </div>
+    <button class="btn" id="start" type="button">Пройти тест</button>
+    <p class="note">Отвечай честно. Врать тут можно только себе.</p>
+  </section>
+
+  <!-- Question -->
+  <section class="screen" id="quiz" hidden>
+    <div class="top">
+      <span class="tag" id="q-tag">Тело</span>
+      <span class="count" id="q-count">1 / 9</span>
+    </div>
+    <div class="bar"><i id="q-bar"></i></div>
+    <h2 id="q-text">Вопрос</h2>
+    <div class="opts" id="q-opts"></div>
+    <button class="ghost" id="back" type="button">← Назад</button>
+  </section>
+
+  <!-- Result -->
+  <section class="screen" id="result" hidden>
+    <span class="eyebrow" id="r-eyebrow">Твоя сломанная опора</span>
+    <div class="verdict" id="r-verdict">Деньги</div>
+    <div class="scores" id="r-scores"></div>
+    <div class="body-text">
+      <p id="r-main"></p>
+      <p id="r-sub"></p>
+    </div>
+    <a class="btn" id="cta" href="#">Вступить в канал</a>
+    <p class="note" id="cta-note">Что с этим делать — разбираем в канале.</p>
+    <button class="ghost" id="again" type="button">Пройти заново</button>
+  </section>
+</main>
+
+<script>
+  // Ссылка на Telegram-канал, например "https://t.me/your_channel"
+  const TG_LINK = "https://t.me/+tzA6rrDm7Jk0Njky";
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) {
+    tg.ready(); tg.expand();
+    try { tg.setHeaderColor("#09090a"); tg.setBackgroundColor("#09090a"); } catch (e) {}
+  }
+  const haptic = (t) => { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
+  const openChannel = () => {
+    if (tg && tg.openTelegramLink && TG_LINK.startsWith("https://t.me/")) tg.openTelegramLink(TG_LINK);
+    else window.location.href = TG_LINK;
+  };
+
+  const PILLARS = {
+    body:  { name: "Тело",   short: "Тело" },
+    mind:  { name: "Голова", short: "Голова" },
+    money: { name: "Деньги", short: "Деньги" },
+  };
+
+  // 0 — плохо, 3 — сильно
+  const QUESTIONS = [
+    { p: "body", q: "Сколько раз подтянешься прямо сейчас?",
+      a: ["Ни разу", "1–5", "6–12", "13 и больше"] },
+    { p: "body", q: "Сколько тренировок было за последние 7 дней?",
+      a: ["Ни одной", "Одна", "2–3", "4 и больше"] },
+    { p: "body", q: "Как ты спишь?",
+      a: ["Ложусь когда придётся, встаю разбитым", "Часто не высыпаюсь", "В основном нормально", "Режим. Встаю без будильника"] },
+    { p: "mind", q: "Сколько дел ты откладываешь дольше месяца?",
+      a: ["5 и больше", "3–4", "1–2", "Ни одного"] },
+    { p: "mind", q: "Сколько часов в день уходит на телефон без дела?",
+      a: ["5 и больше", "3–4", "1–2", "Меньше часа"] },
+    { p: "mind", q: "Что ты делаешь, когда план срывается?",
+      a: ["Бросаю", "Злюсь и откладываю на потом", "Расстраиваюсь, но продолжаю", "Перестраиваюсь и делаю дальше"] },
+    { p: "money", q: "Сколько ты проживёшь без дохода?",
+      a: ["Ни месяца", "Около месяца", "2–3 месяца", "Полгода и больше"] },
+    { p: "money", q: "Что стало с твоим доходом за последний год?",
+      a: ["Упал", "Не изменился", "Немного вырос", "Вырос заметно"] },
+    { p: "money", q: "Есть навык, за который тебе платят без начальника?",
+      a: ["Нет", "Есть, но я им не зарабатываю", "Иногда беру заказы", "Да, это мой основной доход"] },
+  ];
+
+  const RESULTS = {
+    body: {
+      main: "Ты можешь строить любые планы, но тело сдаётся раньше. Нет энергии — нет ни головы, ни денег.",
+      sub: "Хорошая новость: тело чинится быстрее всего. С режима и начнём.",
+    },
+    mind: {
+      main: "Ты знаешь, что делать. Но откладываешь, отвлекаешься и сдаёшься при первом давлении.",
+      sub: "Пока голова не держит удар, всё остальное рассыпается. Это чинится не мотивацией, а режимом.",
+    },
+    money: {
+      main: "Тело и голова у тебя есть. Но без навыка, который стабильно приносит деньги, ты зависишь от начальника и от удачи.",
+      sub: "Мужчина без денег теряет выбор. Первый шаг — навык, за который платят.",
+    },
+    none: {
+      main: "Все три опоры держатся. Это редкость.",
+      sub: "Теперь главное — не расслабиться. Сильных ломает не давление, а комфорт.",
+    },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const screens = { intro: $("intro"), quiz: $("quiz"), result: $("result") };
+  let step = 0;
+  let answers = [];
+
+  function show(name) {
+    Object.entries(screens).forEach(([k, el]) => { el.hidden = k !== name; });
+    window.scrollTo(0, 0);
+  }
+
+  function renderQuestion() {
+    const item = QUESTIONS[step];
+    $("q-tag").textContent = PILLARS[item.p].name;
+    $("q-count").textContent = `${step + 1} / ${QUESTIONS.length}`;
+    $("q-bar").style.width = `${(step / QUESTIONS.length) * 100}%`;
+    $("q-text").textContent = item.q;
+    const box = $("q-opts");
+    box.replaceChildren();
+    item.a.forEach((text, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt" + (answers[step] === i ? " picked" : "");
+      b.id = `opt-${step}-${i}`;
+      b.textContent = text;
+      b.addEventListener("click", () => pick(i, b));
+      box.append(b);
+    });
+    $("back").hidden = false;
+    const s = screens.quiz;
+    s.style.animation = "none"; void s.offsetWidth; s.style.animation = "";
+  }
+
+  function pick(i, btn) {
+    haptic("light");
+    answers[step] = i;
+    btn.classList.add("picked");
+    setTimeout(() => {
+      step += 1;
+      if (step < QUESTIONS.length) renderQuestion();
+      else renderResult();
+    }, 180);
+  }
+
+  function score() {
+    const totals = { body: 0, mind: 0, money: 0 };
+    QUESTIONS.forEach((item, i) => { totals[item.p] += answers[i] ?? 0; });
+    return totals; // max 9 each
+  }
+
+  function weakest(totals) {
+    // при равенстве: деньги → тело → голова
+    const order = ["money", "body", "mind"];
+    const min = Math.min(...order.map((k) => totals[k]));
+    if (min >= 7) return "none";
+    return order.find((k) => totals[k] === min);
+  }
+
+  function renderResult() {
+    const totals = score();
+    const weak = weakest(totals);
+    $("r-eyebrow").textContent = weak === "none" ? "Твой результат" : "Твоя сломанная опора";
+    $("r-verdict").textContent = weak === "none" ? "Всё держится" : PILLARS[weak].name;
+    const box = $("r-scores");
+    box.replaceChildren();
+    ["body", "mind", "money"].forEach((k) => {
+      const row = document.createElement("div");
+      row.className = "score" + (k === weak ? " weak" : "");
+      const name = document.createElement("b");
+      name.textContent = PILLARS[k].name;
+      const track = document.createElement("div");
+      track.className = "track";
+      const fill = document.createElement("i");
+      fill.style.width = `${Math.max(4, (totals[k] / 9) * 100)}%`;
+      track.append(fill);
+      const val = document.createElement("em");
+      val.textContent = `${totals[k]}/9`;
+      row.append(name, track, val);
+      box.append(row);
+    });
+    $("r-main").textContent = RESULTS[weak].main;
+    $("r-sub").textContent = RESULTS[weak].sub;
+    const cta = $("cta");
+    if (TG_LINK) {
+      cta.href = TG_LINK;
+      cta.removeAttribute("aria-disabled");
+      $("cta-note").textContent = "Что с этим делать — разбираем в канале.";
+    } else {
+      cta.removeAttribute("href");
+      cta.setAttribute("aria-disabled", "true");
+      $("cta-note").textContent = "Ссылка на канал появится здесь.";
+    }
+    show("result");
+  }
+
+  $("start").addEventListener("click", () => { step = 0; answers = []; show("quiz"); renderQuestion(); });
+  $("back").addEventListener("click", () => {
+    if (step === 0) { show("intro"); return; }
+    step -= 1; renderQuestion();
+  });
+  $("again").addEventListener("click", () => { step = 0; answers = []; show("intro"); });
+  $("cta").addEventListener("click", (e) => { if (tg && tg.openTelegramLink) { e.preventDefault(); openChannel(); } });
+</script>
+</body>
+</html>
