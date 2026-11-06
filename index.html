@@ -159,9 +159,19 @@
     try { tg.setHeaderColor("#09090a"); tg.setBackgroundColor("#09090a"); } catch (e) {}
   }
   const haptic = (t) => { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
-  const openChannel = () => {
-    if (tg && tg.openTelegramLink && TG_LINK.startsWith("https://t.me/")) tg.openTelegramLink(TG_LINK);
-    else window.location.href = TG_LINK;
+  // Внутри Telegram (initData не пустая) открываем канал нативно и закрываем Mini App,
+  // иначе окно «Вступить» может остаться под полноэкранным приложением.
+  // В обычном браузере ссылка работает как есть.
+  const inTelegram = !!(tg && tg.initData);
+  const openChannel = (e) => {
+    if (!inTelegram) return;
+    e.preventDefault();
+    try {
+      tg.openTelegramLink(TG_LINK);
+      setTimeout(() => { try { tg.close(); } catch (_) {} }, 400);
+    } catch (_) {
+      try { tg.openLink(TG_LINK); } catch (__) { window.location.href = TG_LINK; }
+    }
   };
 
   const PILLARS = {
@@ -311,7 +321,7 @@
     step -= 1; renderQuestion();
   });
   $("again").addEventListener("click", () => { step = 0; answers = []; show("intro"); });
-  $("cta").addEventListener("click", (e) => { if (tg && tg.openTelegramLink) { e.preventDefault(); openChannel(); } });
+  $("cta").addEventListener("click", openChannel);
 </script>
 </body>
 </html>
